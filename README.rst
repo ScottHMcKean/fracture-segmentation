@@ -1,6 +1,6 @@
 .. image:: https://travis-ci.org/bast/somepackage.svg?branch=master
    :target: https://travis-ci.org/bast/somepackage/builds
-.. image:: https://img.shields.io/badge/license-%20MPL--v2.0-blue.svg
+.. image:: https://img.shields.io/badge/License-GPLv3-blue.svg
    :target: ../master/LICENSE
 
 
