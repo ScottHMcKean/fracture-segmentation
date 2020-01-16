@@ -23,8 +23,8 @@ setup(
     author='Scott McKean',
     author_email='scott.mckean@ucalgary.ca',
     url='https://github.com/bast/somepackage',
-    license='MPL-2.0',
-    packages=['somepackage'],
+    license='GPLv3',
+    packages=['fracture-segmentation'],
 #   no dependencies in this example
 #   install_requires=[
 #       'dependency==1.2.3',
@@ -33,8 +33,7 @@ setup(
 #   scripts=['bin/a-script'],
     include_package_data=True,
     classifiers=[
-        'Development Status :: 5 - Production/Stable',
+        'Development Status :: 2 - Pre-Alpha',
         'Intended Audience :: Science/Research',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3.6'],
     )
