@@ -10,8 +10,9 @@ class FractureSegment(object):
     save_figures = False
     canny_method = 'horizontal'
     min_large_edge_px = 50
-    min_line_length_px = 50
+    phough_min_line_length_px = 50
     phough_line_gap_px = 10
+    phough_accumulator_threshold = 100
     
     def __init__(self, filepath):
         self.img = io.imread(filepath, as_gray = True)
@@ -27,8 +28,9 @@ class FractureSegment(object):
         print('save_figures: ' + str(self.save_figures))
         print('canny_method: ' + str(self.canny_method))
         print('min_large_edge_px: ' + str(self.min_large_edge_px))
-        print('min_line_length_px: ' + str(self.min_line_length_px))
+        print('phough_min_line_length_px: ' + str(self.phough_min_line_length_px))
         print('phough_line_gap_px: ' + str(self.phough_line_gap_px))
+        print('phough_accumulator_threshold: ' + str(self.phough_accumulator_threshold))
         
     def show_img(self):
         """ Show image using io.imshow and matplotlib """
@@ -67,7 +69,7 @@ class FractureSegment(object):
             plt.show()
         
         if self.save_figures:
-            io.imsave('./output/img_edges.png',img_as_ubyte(self.img_edges))
+            io.imsave('./output/img_edges.png',util.img_as_ubyte(self.img_edges))
             
     def close_gaps(self):
         """ Close small holes with binary closing to within x pixels """
@@ -81,7 +83,7 @@ class FractureSegment(object):
             plt.show()
         
         if self.save_figures:
-            io.imsave('./output/img_closededges.png',img_as_ubyte(self.img_closededges))
+            io.imsave('./output/img_closededges.png',util.img_as_ubyte(self.img_closededges))
     
     def label_edges(self):
         """ Label connected edges/components using skimage wrapper """
@@ -127,7 +129,7 @@ class FractureSegment(object):
             plt.show()
 
         if self.save_figures:
-            io.imsave('./output/img_large_edges.png',img_as_ubyte(self.img_large_edges > 0))
+            io.imsave('./output/img_large_edges.png',util.img_as_ubyte(self.img_large_edges > 0))
             
     def run_phough_transform(self):
         """ Run the Probabilistic Hough Transform """
@@ -135,16 +137,18 @@ class FractureSegment(object):
         
         self.lines = probabilistic_hough_line(
                 self.img_large_edges,    
-                line_length=self.min_line_length_px,
-                line_gap=self.phough_line_gap_px)
+                line_length=self.phough_min_line_length_px,
+                line_gap=self.phough_line_gap_px,
+                threshold = self.phough_accumulator_threshold)
         
         if self.show_figures:
             fig, ax = plt.subplots(1, 1)
             io.imshow(self.img_large_edges * 0)
-            for line in lines:
+            for line in self.lines:
                 p0, p1 = line
                 ax.plot((p0[0], p1[0]), (p0[1], p1[1]))
             ax.set_xlim((0, self.img_large_edges.shape[1]))
             ax.set_ylim((self.img_large_edges.shape[0], 0))
             plt.show()
     
+

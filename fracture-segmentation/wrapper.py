@@ -38,10 +38,20 @@ sample.label_edges()
 sample.count_edges()
 
 # find large edges above a minimum threshold
-sample.min_large_edge_px = 50
+sample.min_large_edge_px = 100
 sample.find_large_edges()
 
 # run the probabilistic hough transform
 sample.min_line_length_px = 50
-sample.phough_line_gap_px = 10
+sample.phough_line_gap_px = 25
+sample.phough_threshold = 0.9
 sample.run_phough_transform()
+
+# convert lines to geospatial format
+import shapely
+import geopandas as gpd
+import pandas as pd
+
+test_edges = gpd.read_file('./data/test_edges.dxf')
+test_edges.plot()
+
