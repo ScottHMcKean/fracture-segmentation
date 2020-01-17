@@ -9,7 +9,9 @@ class FractureSegment(object):
     show_figures = False
     save_figures = False
     canny_method = 'horizontal'
-    min_edge_px = 30
+    min_large_edge_px = 50
+    min_line_length_px = 50
+    phough_line_gap_px = 10
     
     def __init__(self, filepath):
         self.img = io.imread(filepath, as_gray = True)
@@ -24,7 +26,9 @@ class FractureSegment(object):
         print('show_figures: ' + str(self.show_figures))
         print('save_figures: ' + str(self.save_figures))
         print('canny_method: ' + str(self.canny_method))
-        print('min_edge_px: ' + str(self.min_edge_px))
+        print('min_large_edge_px: ' + str(self.min_large_edge_px))
+        print('min_line_length_px: ' + str(self.min_line_length_px))
+        print('phough_line_gap_px: ' + str(self.phough_line_gap_px))
         
     def show_img(self):
         """ Show image using io.imshow and matplotlib """
@@ -107,14 +111,15 @@ class FractureSegment(object):
         """ Label connected edges/components using skimage wrapper """ 
         self.large_edge_dict = {k: v for k, v 
                                 in self.edge_dict.items()
-                                if v >= self.min_edge_px}
+                                if v >= self.min_large_edge_px}
         
         large_edge_cov = len(self.large_edge_dict) / len(self.edge_dict) * 100
         
         print(str(large_edge_cov) + '% large edges')
         
         large_edge_bool = np.isin(self.img_labelled, list(self.large_edge_dict.keys()))
-        self.img_large_edges = sample.img_labelled.copy()
+        
+        self.img_large_edges = self.img_labelled.copy()
         self.img_large_edges[np.invert(large_edge_bool)] = 0
 
         if self.show_figures:
@@ -123,3 +128,23 @@ class FractureSegment(object):
 
         if self.save_figures:
             io.imsave('./output/img_large_edges.png',img_as_ubyte(self.img_large_edges > 0))
+            
+    def run_phough_transform(self):
+        """ Run the Probabilistic Hough Transform """
+        print('Running Probabilistic Hough Transform')
+        
+        self.lines = probabilistic_hough_line(
+                self.img_large_edges,    
+                line_length=self.min_line_length_px,
+                line_gap=self.phough_line_gap_px)
+        
+        if self.show_figures:
+            fig, ax = plt.subplots(1, 1)
+            io.imshow(self.img_large_edges * 0)
+            for line in lines:
+                p0, p1 = line
+                ax.plot((p0[0], p1[0]), (p0[1], p1[1]))
+            ax.set_xlim((0, self.img_large_edges.shape[1]))
+            ax.set_ylim((self.img_large_edges.shape[0], 0))
+            plt.show()
+    
