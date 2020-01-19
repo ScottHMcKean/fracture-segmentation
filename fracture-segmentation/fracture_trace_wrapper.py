@@ -8,6 +8,8 @@ import geopandas as gpd
 import numpy as np
 import matplotlib.pyplot as plt
 from shapely.geometry import Point, LineString
+exec(open('helpers.py').read())
+exec(open('FractureTrace.py').read())
 
 # Initialize and load
 trace = FractureTrace()
@@ -22,25 +24,13 @@ trace.make_convex_hull()
 # trim the outside scanlines
 trace.intersect_scanlines_hull()
 
-# intersect the scanlines with traces
-trace.intersect_horizontal_scanlines_traces()
+# intersect the scanlines with traces and calculated statistics
+trace.intersect_scanlines_traces()
+trace.calc_scanline_stats()
 
-# get scanline stats (p10, )
-trace.calc_horizontal_scanline_p10()
+# make rolling segments along scanlines
+trace.make_scanline_segments()
 
-combine_geo_list()
-
-def combine_geo_list(geo_list):
-   for i in range(0, len(geo_list)):
-      if i == 0:
-          out = gpd.GeoSeries(geo_list[i])
-      else:
-          out = out.append(geo_list[i]) 
-
-
-test = [test.append(points) for points in ]
-test = gpd.GeoSeries(trace.horiz_scanline_intersected_points[1])
-test = test.append(trace.horiz_scanline_intersected_points[2])
 
 ## make scanline segments
 x_coord = np.unique(scanline.xy[0])

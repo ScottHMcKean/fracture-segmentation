@@ -55,19 +55,23 @@ class FractureTrace(object):
         start = list(zip(np.repeat(min(horiz_limits),len(vert_splits)), vert_splits))
         end = list(zip(np.repeat(max(horiz_limits),len(vert_splits)), vert_splits))
         lines = list(zip(start,end))
-        names = ['scan_h__' + str(i) for i in np.arange(0,len(lines))+1]
+        names = ['scan_h_' + str(i) for i in np.arange(0,len(lines))+1]
             
-        self.scanlines_horizontal = gpd.GeoDataFrame({
-                'name': names},
+        self.horizontal_scanlines = gpd.GeoDataFrame({
+                'name': names,
+                'y_coord': vert_splits},
                 geometry = gpd.GeoSeries(map(LineString, lines))
                 )
+        
+        self.horizontal_scanlines['orig_length'] = self.horizontal_scanlines.length
+        self.horizontal_scanlines['orig_geom'] = self.horizontal_scanlines['geometry']
         
         print('Horizontal scanlines generated')
         
         if self.show_figures:
             fig, ax = plt.subplots(1, 1)
             self.traces.plot(color = 'k', ax=ax)
-            self.scanlines_horizontal.plot(color = 'r', ax=ax)
+            self.horizontal_scanlines.plot(color = 'r', ax=ax)
             plt.show()
 
     def make_vertical_scanlines(self):
@@ -83,19 +87,23 @@ class FractureTrace(object):
         start = list(zip(horiz_splits, np.repeat(min(vert_limits),len(horiz_splits))))
         end = list(zip(horiz_splits, np.repeat(max(vert_limits),len(horiz_splits))))
         lines = list(zip(start,end))
-        names = ['scan_v_' + str(i) for i in np.arange(0,len(lines))+1]
+        names = ['scan_v' + str(i) for i in np.arange(0,len(lines))+1]
             
-        self.scanlines_vertical = gpd.GeoDataFrame({
-                'name': names},
+        self.vertical_scanlines = gpd.GeoDataFrame({
+                'name': names,
+                'x_coord': horiz_splits},
                 geometry =  gpd.GeoSeries(map(LineString, lines))
                 )
+        
+        self.vertical_scanlines['orig_length'] = self.vertical_scanlines.length
+        self.vertical_scanlines['orig_geom'] = self.vertical_scanlines['geometry']
         
         print('Vertical scanlines generated')
         
         if self.show_figures:
             fig, ax = plt.subplots(1, 1)
             self.traces.plot(color = 'k', ax=ax)
-            self.scanlines_vertical.plot(color = 'r', ax=ax)
+            self.vertical_scanlines.plot(color = 'r', ax=ax)
             plt.show()
             
     def make_scanlines(self):
@@ -115,26 +123,30 @@ class FractureTrace(object):
             plt.show()
             
     def intersect_scanlines_hull(self):
-        self.scanlines_horizontal_hulled = gpd.GeoDataFrame(
-                {'name' : self.scanlines_horizontal['name']},
-                geometry = [self.total_convex_hull.intersection(x) 
+        self.horizontal_scanlines['hull_trimmed'] = [
+                self.total_convex_hull.intersection(x) 
                     for x 
-                    in self.scanlines_horizontal.geometry]
-                )
+                    in self.horizontal_scanlines.geometry]
     
-        self.scanlines_vertical_hulled = gpd.GeoDataFrame(
-                {'name' : self.scanlines_vertical['name']},
-                geometry = [self.total_convex_hull.intersection(x) 
+        self.horizontal_scanlines = self.horizontal_scanlines.set_geometry('hull_trimmed')
+        self.horizontal_scanlines['trimmed_length'] = self.horizontal_scanlines.length
+        
+        self.vertical_scanlines['hull_trimmed'] = [
+                self.total_convex_hull.intersection(x) 
                     for x 
-                    in self.scanlines_vertical.geometry]
-                )
+                    in self.vertical_scanlines.geometry]
+            
+        self.vertical_scanlines = self.vertical_scanlines.set_geometry('hull_trimmed')
+        self.vertical_scanlines['trimmed_length'] = self.vertical_scanlines.length
+        
+        print('Scanlines trimmed')
         
         if self.show_figures:
             fig, ax = plt.subplots(1, 1)
             self.traces.plot(color = 'k', ax=ax)
             ax.plot(*self.total_convex_hull.exterior.xy, color = 'b')
-            self.scanlines_vertical_hulled.plot(color = 'r', ax=ax)
-            self.scanlines_horizontal_hulled.plot(color = 'r', ax=ax)
+            self.horizontal_scanlines.plot(color = 'r', ax=ax)
+            self.vertical_scanlines.plot(color = 'r', ax=ax)
             plt.show()
             
     def intersect_scanlines_traces(self):
@@ -145,7 +157,7 @@ class FractureTrace(object):
         self.horiz_scanline_intersections = [
                 self.traces.intersection(other = scanline) 
                 for scanline
-                in self.scanlines_horizontal_hulled.geometry
+                in self.horizontal_scanlines.geometry
                 ]
         
         self.horiz_scanline_intersected_traces = [
@@ -160,8 +172,68 @@ class FractureTrace(object):
                 in self.horiz_scanline_intersections
                 ]
         
-    def calc_horizontal_scanline_p10(self):
-        self.frac_to_frac_lengths = [
+        print('Horizontal scanlines and traces intersected')
+        
+        if self.show_figures:
+            fig, ax = plt.subplots(1, 1)
+            self.traces.plot(color = 'k', ax=ax, alpha=0.5)
+            ax.plot(*self.total_convex_hull.exterior.xy, color = 'k', alpha=0.5)
+            self.horizontal_scanlines.plot(color = 'r', ax=ax, alpha=0.5)
+            
+            traces_series = convert_geo_list_to_geoseries(
+                    self.horiz_scanline_intersected_traces
+                    )
+            
+            points_series = convert_geo_list_to_geoseries(
+                    self.horiz_scanline_intersected_points
+                    )
+            
+            traces_series.plot(color = 'r', ax=ax, markersize=5)
+            points_series.plot(color = 'r', ax=ax, markersize=5)
+            plt.show()
+    
+    def intersect_vertical_scanlines_traces(self):
+        self.vert_scanline_intersections = [
+                self.traces.intersection(other = scanline) 
+                for scanline
+                in self.vertical_scanlines.geometry
+                ]
+        
+        self.vert_scanline_intersected_traces = [
+                self.traces[np.invert(intersection.geometry.is_empty)] 
+                for intersection
+                in self.vert_scanline_intersections
+                ]
+        
+        self.vert_scanline_intersected_points = [
+                intersection[np.invert(intersection.is_empty)] 
+                for intersection
+                in self.vert_scanline_intersections
+                ]
+        
+        print('Vertical scanlines and traces intersected')
+        
+        if self.show_figures:
+            fig, ax = plt.subplots(1, 1)
+            self.traces.plot(color = 'k', ax=ax, alpha=0.5)
+            ax.plot(*self.total_convex_hull.exterior.xy, color = 'k', alpha=0.5)
+            self.vertical_scanlines.plot(color = 'b', ax=ax, alpha=0.5)
+            
+            traces_series = convert_geo_list_to_geoseries(
+                    self.vert_scanline_intersected_traces
+                    )
+            
+            points_series = convert_geo_list_to_geoseries(
+                    self.vert_scanline_intersected_points
+                    )
+            
+            traces_series.plot(color = 'b', ax=ax, markersize=5)
+            points_series.plot(color = 'b', ax=ax, markersize=5)
+            plt.show()
+    
+    def calc_horizontal_scanline_stats(self):
+        
+        self.horizontal_scanlines['frac_to_frac_length'] = [
                 max(points.x) - min(points.x) 
                 if len(points) > 0
                 else np.nan
@@ -169,9 +241,38 @@ class FractureTrace(object):
                 in self.horiz_scanline_intersected_points
                 ]
         
-        point_frac_length_tuple = list(
-                zip([len(x) for x in self.horiz_scanline_intersected_points], 
-                                 self.frac_to_frac_lengths)
+        point_frac_list = list(
+                zip([len(point) 
+                for point
+                in self.horiz_scanline_intersected_points], 
+                self.horizontal_scanlines['frac_to_frac_length'])
                 )
         
-        self.horiz_scanline_p10 = [x[0]/x[1] if x[1] > 0 else np.nan for x in int_list]
+        self.horizontal_scanlines['p10'] = [x[0]/x[1] if x[1] > 0 else np.nan for x in point_frac_list]
+        
+        print('Horizontal scanline stats calculated')
+        
+    def calc_vertical_scanline_stats(self):
+        
+        self.vertical_scanlines['frac_to_frac_length'] = [
+                max(points.y) - min(points.y) 
+                if len(points) > 0
+                else np.nan
+                for points
+                in self.vert_scanline_intersected_points
+                ]
+        
+        point_frac_list = list(
+                zip([len(point) 
+                for point 
+                in self.vert_scanline_intersected_points], 
+                self.vertical_scanlines['frac_to_frac_length'])
+                )
+        
+        self.vertical_scanlines['p10'] = [x[0]/x[1] if x[1] > 0 else np.nan for x in point_frac_list]
+        
+        print('Vertical scanline stats calculated')
+        
+    def calc_scanline_stats(self):
+        self.calc_horizontal_scanline_stats()
+        self.calc_vertical_scanline_stats()
