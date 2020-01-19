@@ -1,4 +1,5 @@
 venv/
 .cache/
 __pycache__/
-/output/
+/fracture-segmentation/output
+/fracture-segmentation/input
