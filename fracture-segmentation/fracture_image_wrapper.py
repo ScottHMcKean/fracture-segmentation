@@ -5,15 +5,12 @@ Created on Thu Jan 16 09:08:26 2020
 @author: scott.mckean
 """
 import matplotlib.pyplot as plt
-from matplotlib import cm
-import skimage
-import sys
 from skimage import io, measure, util
 from skimage.restoration import denoise_bilateral
 from skimage.feature import canny
 from skimage.morphology import binary_closing, square
 from skimage.transform import probabilistic_hough_line
-import shapely
+from shapely.geometry import LineString
 import geopandas as gpd
 
 # load and set output flags
@@ -52,10 +49,4 @@ sample.run_phough_transform()
 # create shapely linestrings and export
 sample.convert_linestrings()
 sample.export_linestrings()
-
-# read in manually edited file
-
-
-test_edges = gpd.read_file('./data/test_edges.dxf')
-test_edges.plot()
 

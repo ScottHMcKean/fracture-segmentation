@@ -17,3 +17,12 @@ def get_size(obj, seen=None):
     elif hasattr(obj, '__iter__') and not isinstance(obj, (str, bytes, bytearray)):
         size += sum([get_size(i, seen) for i in obj])
     return size
+
+def convert_geo_list_to_geoseries(geo_list):
+    for i in range(0, len(geo_list)):
+        if i == 0:
+            out = gpd.GeoSeries(geo_list[i])
+        else:
+            out = out.append(geo_list[i]) 
+
+    return out
