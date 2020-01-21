@@ -6,22 +6,29 @@ Created on Thu Jan 16 09:08:26 2020
 """
 import geopandas as gpd
 import numpy as np
+import descartes
 import matplotlib.pyplot as plt
-from shapely.geometry import Point, LineString
+from shapely.geometry import Point, LineString, MultiLineString
 exec(open('helpers.py').read())
 exec(open('FractureTrace.py').read())
 
 # Initialize and load
 trace = FractureTrace()
 trace.show_figures = True
-trace.load_traces('./data/test_edges.dxf')
-trace.scale_traces(scale_m_px = 0.001)
+trace.load_traces('./input/ET_TestWindow_AutoFractures.dxf')
+trace.load_masks('./input/ET_TestWindow_Mask.dxf')
+trace.scale(scale_m_px = 0.020699)
 
 # Generate scanlines
+trace.scanline_distance_m = 0.5
 trace.make_scanlines()
-trace.make_convex_hull()
 
-# trim the outside scanlines
+# Mask traces and scanlines
+trace.mask_traces()
+trace.mask_scanlines()
+
+# Make convex hull and trim scanline outside of it
+trace.make_convex_hull()
 trace.intersect_scanlines_hull()
 
 # intersect the scanlines with traces and calculated statistics
@@ -29,17 +36,11 @@ trace.intersect_scanlines_traces()
 trace.calc_scanline_stats()
 
 # make rolling segments along scanlines
+# having issues with the multi line string object...?
 trace.make_scanline_segments()
 
-
-## make scanline segments
-x_coord = np.unique(scanline.xy[0])
-y_coords = np.arange(np.min(scanline.xy[1]), np.max(scanline.xy[1]), trace.window_step_increment_m)
-seg_start_point = list(zip(np.repeat(x_coord,len(y_coords[0:-1])), y_coords[0:-1]))
-seg_end_point = list(zip(np.repeat(x_coord,len(y_coords[1:])), y_coords[1:]))
-seg_points = list(zip(seg_start_point,seg_end_point))
-scanline_segments = gpd.GeoSeries(map(LineString, seg_points))
-
+    
+    
 ## get p10 of segments
 for segment in scanline_segments:
     seg_intersections = trace.traces.intersection(segment)

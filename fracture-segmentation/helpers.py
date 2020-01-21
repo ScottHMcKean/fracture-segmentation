@@ -26,3 +26,21 @@ def convert_geo_list_to_geoseries(geo_list):
             out = out.append(geo_list[i]) 
 
     return out
+
+def make_vertical_segments(scanline, step_increment = 0.1):
+    x_coord = np.unique(scanline.xy[0])
+    y_coords = np.arange(np.min(scanline.xy[1]), np.max(scanline.xy[1]), step_increment)
+    seg_start_point = list(zip(np.repeat(x_coord,len(y_coords[0:-1])), y_coords[0:-1]))
+    seg_end_point = list(zip(np.repeat(x_coord,len(y_coords[1:])), y_coords[1:]))
+    seg_points = list(zip(seg_start_point,seg_end_point))
+    scanline_segments = gpd.GeoSeries(map(LineString, seg_points))
+    return MultiLineString(list(scanline_segments))
+    
+def make_horizontal_segments(scanline, step_increment = 0.1):
+    y_coord = np.unique(scanline.xy[1])
+    x_coords = np.arange(np.min(scanline.xy[0]), np.max(scanline.xy[0]), step_increment)
+    seg_start_point = list(zip(x_coords[0:-1], np.repeat(y_coord,len(x_coords[0:-1]))))
+    seg_end_point = list(zip(x_coords[1:],np.repeat(x_coords,len(y_coords[1:]))))
+    seg_points = list(zip(seg_start_point,seg_end_point))
+    scanline_segments = gpd.GeoSeries(map(LineString, seg_points))
+    return MultiLineString(list(scanline_segments))
