@@ -4,8 +4,8 @@ class FractureTrace(object):
     
     show_figures = False
     save_figures = False
-    window_width_m = 1
-    window_step_increment_m = 0.1
+    segment_width_m = 1
+    segment_step_increment_m = 0.1
     scanline_distance_m = 0.1
     scale_m_px = 1
     
@@ -16,8 +16,8 @@ class FractureTrace(object):
         """ Print a list of object parameters """
         print('show_figures: ' + str(self.show_figures))
         print('save_figures: ' + str(self.save_figures))
-        print('window_width_m: ' + str(self.window_width_m))
-        print('window_step_increment_m: ' + str(self.window_step_increment_m))
+        print('segment_width_m: ' + str(self.window_width_m))
+        print('segment_step_increment_m: ' + str(self.window_step_increment_m))
         print('scanline_distance_m: ' + str(self.scanline_distance_m))
         
     def load_traces(self, file_path):
@@ -160,8 +160,8 @@ class FractureTrace(object):
         
         if self.show_figures:
                 fig, ax = plt.subplots(1, 1)
-                self.horizontal_scanlines_orig.plot(color = 'k', ax=ax, alpha = 0.5)
-                self.horizontal_scanlines.plot(color = 'r', ax=ax)
+                self.horizontal_scanlines_orig[~self.horizontal_scanlines_orig.is_empty].plot(color = 'k', ax=ax, alpha = 0.5)
+                self.horizontal_scanlines[~self.horizontal_scanlines.is_empty].plot(color = 'r', ax=ax)
                 for mask in self.masks:
                     ax.plot(*mask.exterior.xy, color = 'b')
                 plt.show()
@@ -181,8 +181,8 @@ class FractureTrace(object):
         
         if self.show_figures:
                 fig, ax = plt.subplots(1, 1)
-                self.vertical_scanlines_orig.plot(color = 'k', ax=ax, alpha = 0.5)
-                self.vertical_scanlines.plot(color = 'r', ax=ax)
+                self.vertical_scanlines_orig[~self.vertical_scanlines_orig.is_empty].plot(color = 'k', ax=ax, alpha = 0.5)
+                self.vertical_scanlines[~self.vertical_scanlines.is_empty].plot(color = 'r', ax=ax)
                 for mask in self.masks:
                     ax.plot(*mask.exterior.xy, color = 'b')
                 plt.show()
@@ -229,30 +229,7 @@ class FractureTrace(object):
             self.horizontal_scanlines[~self.horizontal_scanlines.is_empty].plot(color = 'r', ax=ax)
             self.vertical_scanlines[~self.vertical_scanlines.is_empty].plot(color = 'r', ax=ax)
             plt.show()
-            
-    def intersect_scanlines_masks(self):
-        self.horizontal_scanlines['hull_trimmed'] = [
-                self.total_convex_hull.intersection(x) 
-                    for x 
-                    in self.horizontal_scanlines.geometry]
-    
-        self.horizontal_scanlines = self.horizontal_scanlines.set_geometry('hull_trimmed')
-        self.horizontal_scanlines['trimmed_length'] = self.horizontal_scanlines.length
-        
-        print('Scanlines trimmed')
-        
-        if self.show_figures:
-            fig, ax = plt.subplots(1, 1)
-            self.traces.plot(color = 'k', ax=ax)
-            ax.plot(*self.total_convex_hull.exterior.xy, color = 'b')
-            self.horizontal_scanlines[~self.horizontal_scanlines.is_empty].plot(color = 'r', ax=ax)
-            self.vertical_scanlines[~self.vertical_scanlines.is_empty].plot(color = 'r', ax=ax)
-            plt.show()
-            
-    def intersect_scanlines_traces(self):
-        self.intersect_horizontal_scanlines_traces()
-        self.intersect_vertical_scanlines_traces()
-        
+                
     def intersect_horizontal_scanlines_traces(self):
         self.horiz_scanline_intersections = [
                 self.traces.intersection(other = scanline) 
@@ -331,6 +308,10 @@ class FractureTrace(object):
             points_series.plot(color = 'b', ax=ax, markersize=5)
             plt.show()
     
+    def intersect_scanlines_traces(self):
+        self.intersect_horizontal_scanlines_traces()
+        self.intersect_vertical_scanlines_traces()
+    
     def calc_horizontal_scanline_stats(self):
         
         self.horizontal_scanlines['frac_to_frac_length'] = [
@@ -397,16 +378,245 @@ class FractureTrace(object):
       
     def make_scanline_segments(self):
         
-        self.horizontal_segments = (
-                [make_horizontal_segments(x, step_increment = self.window_step_increment_m)
+        self.vertical_segments = pd.concat(
+                [make_vertical_segments(
+                        x, 
+                        step_increment = self.segment_step_increment_m,
+                        segment_width = self.segment_width_m
+                        )
                 for x
-                in self.horizontal_scanlines['orig_geom']]
+                in self.vertical_scanlines.iterrows()]
+                ).reset_index()
+                
+        print('Vertical segments generated')
+                
+        self.horizontal_segments = pd.concat(
+                [make_horizontal_segments(
+                        x, 
+                        step_increment = self.segment_step_increment_m,
+                        segment_width = self.segment_width_m
+                        )
+                for x
+                in self.horizontal_scanlines.iterrows()]
+                ).reset_index()
+                
+        print('Horizontal segments generated')
+        
+    def mask_horizontal_segments(self):
+        self.horizontal_segments_orig = self.horizontal_segments
+        
+        for mask in self.masks: 
+            for (i,line) in enumerate(self.horizontal_segments.geometry):
+                self.horizontal_segments.geometry[i] = self.horizontal_segments.geometry[i].difference(mask)
+        
+        self.horizontal_segments['masked_geom'] = self.horizontal_segments.geometry
+        self.horizontal_segments['masked_length'] = self.horizontal_segments.length
+        
+        print('Saving original horizontal segments as horizontal_segments_orig')
+        print('Overwritting original horizontal segments with masked segments')
+        
+        if self.show_figures:
+                fig, ax = plt.subplots(1, 1)
+                self.horizontal_segments_orig[~self.horizontal_segments_orig.is_empty].plot(color = 'k', ax=ax, alpha = 0.5)
+                self.horizontal_segments[~self.horizontal_segments.is_empty].plot(color = 'r', ax=ax)
+                for mask in self.masks:
+                    ax.plot(*mask.exterior.xy, color = 'b')
+                plt.show()
+                
+    def mask_vertical_segments(self):
+        self.vertical_segments_orig = self.vertical_segments
+        
+        for mask in self.masks: 
+            for (i,line) in enumerate(self.vertical_segments.geometry):
+                self.vertical_segments.geometry[i] = self.vertical_segments.geometry[i].difference(mask)
+        
+        self.vertical_segments['masked_geom'] = self.vertical_segments.geometry
+        self.vertical_segments['masked_length'] = self.vertical_segments.length
+        
+        print('Saving original vertical segments as vertical_segments_orig')
+        print('Overwritting original vertical segments with masked segments')
+        
+        if self.show_figures:
+                fig, ax = plt.subplots(1, 1)
+                self.vertical_segments_orig[~self.vertical_segments_orig.is_empty].plot(color = 'k', ax=ax, alpha = 0.5)
+                self.vertical_segments[~self.vertical_segments.is_empty].plot(color = 'r', ax=ax)
+                for mask in self.masks:
+                    ax.plot(*mask.exterior.xy, color = 'b')
+                plt.show()
+  
+    def mask_segments(self):
+        self.mask_vertical_segments()
+        self.mask_horizontal_segments()
+        
+    def intersect_segments_hull(self):
+        self.horizontal_segments.geometry = [
+                self.total_convex_hull.intersection(x) 
+                    for x 
+                    in self.horizontal_segments.geometry]
+    
+        self.horizontal_segments['hull_trimmed'] = self.horizontal_segments.geometry
+        self.horizontal_segments['trimmed_length'] = self.horizontal_segments.length
+        
+        self.vertical_segments.geometry = [
+                self.total_convex_hull.intersection(x) 
+                    for x 
+                    in self.vertical_segments.geometry]
+            
+        self.vertical_segments['hull_trimmed'] = self.vertical_segments.geometry
+        self.vertical_segments['trimmed_length'] = self.vertical_segments.length
+        
+        print('Segments trimmed')
+        
+        if self.show_figures:
+            fig, ax = plt.subplots(1, 1)
+            self.traces.plot(color = 'k', ax=ax)
+            ax.plot(*self.total_convex_hull.exterior.xy, color = 'b')
+            self.horizontal_segments[~self.horizontal_segments.is_empty].plot(color = 'r', ax=ax)
+            self.vertical_segments[~self.vertical_segments.is_empty].plot(color = 'r', ax=ax)
+            plt.show()
+                
+    def intersect_horizontal_segments_traces(self):
+        self.horiz_segment_intersections = [
+                self.traces.intersection(other = segment) 
+                for segment
+                in self.horizontal_segments.geometry
+                ]
+        
+        self.horiz_segment_intersected_traces = [
+                self.traces[np.invert(intersection.geometry.is_empty)] 
+                for intersection
+                in self.horiz_segment_intersections
+                ]
+        
+        self.horiz_segment_intersected_points = [
+                intersection[np.invert(intersection.is_empty)] 
+                for intersection
+                in self.horiz_segment_intersections
+                ]
+        
+        print('Horizontal segments and traces intersected')
+        
+        if self.show_figures:
+            fig, ax = plt.subplots(1, 1)
+            self.traces.plot(color = 'k', ax=ax, alpha=0.5)
+            ax.plot(*self.total_convex_hull.exterior.xy, color = 'k', alpha=0.5)
+            self.horizontal_segments[~self.horizontal_segments.is_empty].plot(color = 'k', ax=ax, alpha = 0.5)
+            
+            traces_series = convert_geo_list_to_geoseries(
+                    self.horiz_segment_intersected_traces
+                    )
+            
+            points_series = convert_geo_list_to_geoseries(
+                    self.horiz_segment_intersected_points
+                    )
+            
+            traces_series.plot(color = 'r', ax=ax, markersize=5)
+            points_series.plot(color = 'r', ax=ax, markersize=5)
+            plt.show()
+    
+    def intersect_vertical_segments_traces(self):
+        self.vert_segment_intersections = [
+                self.traces.intersection(other = segment) 
+                for segment
+                in self.vertical_segments.geometry
+                ]
+        
+        self.vert_segment_intersected_traces = [
+                self.traces[np.invert(intersection.geometry.is_empty)] 
+                for intersection
+                in self.vert_segment_intersections
+                ]
+        
+        self.vert_segment_intersected_points = [
+                intersection[np.invert(intersection.is_empty)] 
+                for intersection
+                in self.vert_segment_intersections
+                ]
+        
+        print('Vertical segments and traces intersected')
+        
+        if self.show_figures:
+            fig, ax = plt.subplots(1, 1)
+            self.traces.plot(color = 'k', ax=ax, alpha=0.5)
+            ax.plot(*self.total_convex_hull.exterior.xy, color = 'k', alpha=0.5)
+            self.vertical_segments[~self.vertical_segments.is_empty].plot(color = 'k', ax=ax, alpha = 0.5)
+            
+            traces_series = convert_geo_list_to_geoseries(
+                    self.vert_segment_intersected_traces
+                    )
+            
+            points_series = convert_geo_list_to_geoseries(
+                    self.vert_segment_intersected_points
+                    )
+            
+            traces_series.plot(color = 'b', ax=ax, markersize=5)
+            points_series.plot(color = 'b', ax=ax, markersize=5)
+            plt.show()
+    
+    def intersect_segments_traces(self):
+        self.intersect_horizontal_segments_traces()
+        self.intersect_vertical_segments_traces()
+    
+    def calc_horizontal_segment_stats(self):
+        
+        self.horizontal_segments['frac_to_frac_length'] = [
+                max(points.x) - min(points.x) 
+                if len(points) > 0
+                else np.nan
+                for points
+                in self.horiz_segment_intersected_points
+                ]
+        
+        point_frac_list = list(
+                zip([len(point) 
+                for point
+                in self.horiz_segment_intersected_points], 
+                self.horizontal_segments['frac_to_frac_length'])
                 )
         
-        self.vertical_segments = (
-                [make_vertical_segments(x, step_increment = self.window_step_increment_m)
-                for x
-                in self.vertical_scanlines['orig_geom']]
+        self.horizontal_segments['p10_frac'] = [x[0]/x[1] if x[1] > 0 else np.nan for x in point_frac_list]
+        
+        point_trimmed_list = list(
+                zip([len(point) 
+                for point
+                in self.horiz_segment_intersected_points], 
+                self.horizontal_segments['trimmed_length'])
                 )
         
-        print('Vertical and horizontal segments generated from original scanlines')
+        self.horizontal_segments['p10_trimmed'] = [x[0]/x[1] if x[1] > 0 else np.nan for x in point_trimmed_list]
+       
+        print('Horizontal segment stats calculated')
+        
+    def calc_vertical_segment_stats(self):
+        
+        self.vertical_segments['frac_to_frac_length'] = [
+                max(points.y) - min(points.y) 
+                if len(points) > 0
+                else np.nan
+                for points
+                in self.vert_segment_intersected_points
+                ]
+        
+        point_frac_list = list(
+                zip([len(point) 
+                for point 
+                in self.vert_segment_intersected_points], 
+                self.vertical_segments['frac_to_frac_length'])
+                )
+        
+        self.vertical_segments['p10_frac'] = [x[0]/x[1] if x[1] > 0 else np.nan for x in point_frac_list]
+        
+        point_trimmed_list = list(
+                zip([len(point) 
+                for point 
+                in self.vert_segment_intersected_points], 
+                self.vertical_segments['trimmed_length'])
+                )
+        
+        self.vertical_segments['p10_trimmed'] = [x[0]/x[1] if x[1] > 0 else np.nan for x in point_trimmed_list]
+        
+        print('Vertical segment stats calculated')
+        
+    def calc_segment_stats(self):
+        self.calc_horizontal_segment_stats()
+        self.calc_vertical_segment_stats()

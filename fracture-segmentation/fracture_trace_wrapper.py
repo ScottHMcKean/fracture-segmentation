@@ -5,6 +5,7 @@ Created on Thu Jan 16 09:08:26 2020
 @author: scott.mckean
 """
 import geopandas as gpd
+import pandas as pd
 import numpy as np
 import descartes
 import matplotlib.pyplot as plt
@@ -38,12 +39,7 @@ trace.calc_scanline_stats()
 # make rolling segments along scanlines
 # having issues with the multi line string object...?
 trace.make_scanline_segments()
-
-    
-    
-## get p10 of segments
-for segment in scanline_segments:
-    seg_intersections = trace.traces.intersection(segment)
-    points = seg_intersections[np.invert(seg_intersections.is_empty)]
-    seg_p10 = len(points)/segment.length
-    print(seg_p10)
+trace.mask_segments()
+trace.intersect_segments_hull()
+trace.intersect_segments_traces()
+trace.calc_segment_stats()
