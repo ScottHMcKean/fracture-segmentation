@@ -679,23 +679,18 @@ class FractureTrace(object):
         if self.show_figures:
             fig, ax = plt.subplots(1, 1)
             self.traces.plot(color = 'k', ax=ax)
-                        
-            for window in self.windows[~self.windows.geometry.is_empty].geometry:
-                if (type(window) != 'shapely.geometry.multipolygon.MultiPolygon')
-                plt.plot(*window.exterior.xy)
-                plt.show()
-                
-                ax.plot(*self.windows[~self.windows.geometry.is_empty].geometry[1].exterior.xy)
-                
-                ax.plot(*window.exterior.xy, colour = 'g', alpha = 0.5)
+            
+            for index,row in self.windows.iterrows():
+                if row.geometry.is_empty:
+                    []
+                elif isinstance(row.geometry,geometry.multipolygon.MultiPolygon):
+                    for polygon in row.geometry:
+                        plt.plot(*polygon.exterior.xy)
+                else:
+                    ax.plot(*row.geometry.exterior.xy)
                 
             plt.show()
             
-            for mask in self.masks:
-                ax.plot(*mask.exterior.xy, color = 'k')
-            
-            
-        
     def mask_windows(self):
         self.windows_orig = self.windows
         
@@ -718,16 +713,32 @@ class FractureTrace(object):
         self.windows['masked_area'] = self.windows.area
         self.windows['masked_length'] = self.windows.length
         
-        print('Masking windows segments (saved & overwritten)')
+        print('Masking windows (saved & overwritten)')
         
-        
+        if self.show_figures:
+            fig, ax = plt.subplots(1, 1)
+            self.traces.plot(color = 'k', ax=ax)
+            
+            for mask in self.masks:
+                ax.plot(*mask.exterior.xy, color = 'k')
+            
+            for index,row in self.windows.iterrows():
+                if row.geometry.is_empty:
+                    []
+                elif isinstance(row.geometry,geometry.multipolygon.MultiPolygon):
+                    for polygon in row.geometry:
+                        plt.plot(*polygon.exterior.xy)
+                else:
+                    ax.plot(*row.geometry.exterior.xy)
+            
+            plt.show()
         
     def intersect_windows(self):
         self.windows_intersections = [
                 self.traces.intersection(other = window) if
                 ~window.is_empty else Polygon()
                 for window
-                in self.windows.iloc[954:956,:].geometry
+                in self.windows.geometry
                 ]
         
         self.windows_intersected_traces = [
@@ -738,9 +749,29 @@ class FractureTrace(object):
         
         print('Windows and traces intersected')
         
+        if self.show_figures:
+            fig, ax = plt.subplots(1, 1)
+            
+            for index,row in self.windows.iterrows():
+                if row.geometry.is_empty:
+                    []
+                elif isinstance(row.geometry,geometry.multipolygon.MultiPolygon):
+                    for polygon in row.geometry:
+                        ax.plot(*polygon.exterior.xy)
+                else:
+                    ax.plot(*row.geometry.exterior.xy)
+            
+            [x.plot(ax=ax, color = 'r') 
+            for x 
+            in self.windows_intersected_traces
+            if ~x.is_empty.all() 
+            ]
+            
+            plt.show()
+        
     def calc_window_stats(self):
         trace_count_list = list(
-                zip([traces.count())
+                zip([traces.count()
                 for traces
                 in self.windows_intersected_traces], 
                 self.windows['masked_area'])
@@ -748,7 +779,7 @@ class FractureTrace(object):
         
         self.windows['p20_masked'] = (
                 [x[0]/x[1] if x[1] > 0 else np.nan 
-                 for x in point_trimmed_list]
+                 for x in trace_count_list]
                 )
        
         trace_length_list = list(
@@ -765,19 +796,5 @@ class FractureTrace(object):
         
         print('Window stats calculated')
         
-        if self.show_figures:
-            fig, ax = plt.subplots(1, 1)
-            self.windows_intersected_traces[1].plot(color = 'k', ax=ax, alpha=0.5)
-            self.windows_intersected_points[1].plot(ax = ax, color = 'r')
-            ax.plot(*window.geometry.exterior.xy)
-            
-            plt.show()
-            for polygon in window:
-                ax.plot(*polygon.exterior.xy)
-
-    def write_window_tables(self):
-        if self.limit_direction_to != 'vertical':
-            self.horizontal_segments.to_csv('horizontal_segments.csv')
-            
-        if self.limit_direction_to != 'horizontal':
-            self.vertical_segments.to_csv('vertical_segments.csv')
+    def write_window_table(self):
+        self.windows.to_csv('windows.csv')
