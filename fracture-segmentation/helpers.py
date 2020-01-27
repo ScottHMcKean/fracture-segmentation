@@ -84,3 +84,7 @@ def make_horizontal_segments(scanline_row, step_increment = 0.1, segment_width =
     segment_df['orig_geom'] = segment_df['geometry']
     
     return segment_df
+
+def make_polygon_from_tuple(x,y,w):
+    return Polygon([[x - w/2, y - w/2], [x - w/2, y + w/2],
+                    [x + w/2, y + w/2], [x + w/2, y - w/2]])

@@ -629,3 +629,155 @@ class FractureTrace(object):
             
         if self.limit_direction_to != 'horizontal':
             self.vertical_segments.to_csv('vertical_segments.csv')
+            
+    def make_windows(self):
+        vert_limits = list(self.traces.total_bounds[i] for i in [1,3])
+        horiz_limits = list(self.traces.total_bounds[i] for i in [0,2])
+        
+        x_coords = np.arange(
+                min(horiz_limits) + self.window_step_increment_m/2, 
+                max(horiz_limits), self.window_step_increment_m
+                )
+        
+        y_coords = np.arange(
+                min(vert_limits) + self.window_step_increment_m/2, 
+                max(vert_limits), self.window_step_increment_m
+                )
+       
+        x,y,w = np.meshgrid(x_coords, y_coords, self.window_width_m)
+        x_array = np.concatenate(np.concatenate(x))
+        y_array = np.concatenate(np.concatenate(y))
+        w_array = np.concatenate(np.concatenate(w))
+        
+        polygons = ([make_polygon_from_tuple(x,y,w) 
+                     for (x,y,w) in zip(x_array, y_array, w_array)]
+                   )
+        
+        names = ['window_' + str(i) for i in np.arange(0,len(polygons))+1]
+                
+        self.windows = gpd.GeoDataFrame({
+                    'name': names,
+                    'y_coord': x_array,
+                    'x_coord': y_array},
+                    geometry = polygons
+                    )
+            
+        self.windows['orig_width'] = (
+                self.windows.bounds.iloc[:,2] 
+                - self.windows.bounds.iloc[:,0]
+                )
+        
+        self.windows['orig_height'] = (
+                self.windows.bounds.iloc[:,3] 
+                - self.windows.bounds.iloc[:,1]
+                )
+        
+        self.windows['orig_area'] = self.windows.area
+        
+        print('Windows generated')
+        
+        if self.show_figures:
+            fig, ax = plt.subplots(1, 1)
+            self.traces.plot(color = 'k', ax=ax)
+                        
+            for window in self.windows[~self.windows.geometry.is_empty].geometry:
+                if (type(window) != 'shapely.geometry.multipolygon.MultiPolygon')
+                plt.plot(*window.exterior.xy)
+                plt.show()
+                
+                ax.plot(*self.windows[~self.windows.geometry.is_empty].geometry[1].exterior.xy)
+                
+                ax.plot(*window.exterior.xy, colour = 'g', alpha = 0.5)
+                
+            plt.show()
+            
+            for mask in self.masks:
+                ax.plot(*mask.exterior.xy, color = 'k')
+            
+            
+        
+    def mask_windows(self):
+        self.windows_orig = self.windows
+        
+        for mask in self.masks: 
+            for (i,window) in enumerate(self.windows.geometry):
+                self.windows.geometry[i] = self.windows.geometry[i].difference(mask)
+        
+        self.windows['masked_geom'] = self.windows.geometry
+        
+        self.windows['masked_width'] = (
+                self.windows.bounds.iloc[:,2] 
+                - self.windows.bounds.iloc[:,0]
+                )
+        
+        self.windows['masked_height'] = (
+                self.windows.bounds.iloc[:,3] 
+                - self.windows.bounds.iloc[:,1]
+                )
+        
+        self.windows['masked_area'] = self.windows.area
+        self.windows['masked_length'] = self.windows.length
+        
+        print('Masking windows segments (saved & overwritten)')
+        
+        
+        
+    def intersect_windows(self):
+        self.windows_intersections = [
+                self.traces.intersection(other = window) if
+                ~window.is_empty else Polygon()
+                for window
+                in self.windows.iloc[954:956,:].geometry
+                ]
+        
+        self.windows_intersected_traces = [
+                intersection[np.invert(intersection.is_empty)] 
+                for intersection
+                in self.windows_intersections
+                ]
+        
+        print('Windows and traces intersected')
+        
+    def calc_window_stats(self):
+        trace_count_list = list(
+                zip([traces.count())
+                for traces
+                in self.windows_intersected_traces], 
+                self.windows['masked_area'])
+                )
+        
+        self.windows['p20_masked'] = (
+                [x[0]/x[1] if x[1] > 0 else np.nan 
+                 for x in point_trimmed_list]
+                )
+       
+        trace_length_list = list(
+                zip([traces.length.sum()
+                for traces
+                in self.windows_intersected_traces], 
+                self.windows['masked_area'])
+                )
+        
+        self.windows['p21_masked'] = (
+                [x[0]/x[1] if x[1] > 0 else np.nan 
+                 for x in trace_length_list]
+                )
+        
+        print('Window stats calculated')
+        
+        if self.show_figures:
+            fig, ax = plt.subplots(1, 1)
+            self.windows_intersected_traces[1].plot(color = 'k', ax=ax, alpha=0.5)
+            self.windows_intersected_points[1].plot(ax = ax, color = 'r')
+            ax.plot(*window.geometry.exterior.xy)
+            
+            plt.show()
+            for polygon in window:
+                ax.plot(*polygon.exterior.xy)
+
+    def write_window_tables(self):
+        if self.limit_direction_to != 'vertical':
+            self.horizontal_segments.to_csv('horizontal_segments.csv')
+            
+        if self.limit_direction_to != 'horizontal':
+            self.vertical_segments.to_csv('vertical_segments.csv')

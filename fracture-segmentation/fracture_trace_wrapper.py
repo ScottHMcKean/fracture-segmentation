@@ -9,7 +9,7 @@ import pandas as pd
 import numpy as np
 import descartes
 import matplotlib.pyplot as plt
-from shapely.geometry import Point, LineString, MultiLineString
+from shapely.geometry import Point, LineString, Polygon
 exec(open('helpers.py').read())
 exec(open('FractureTrace.py').read())
 
@@ -41,7 +41,7 @@ trace.calc_segment_stats()
 trace.write_segment_tables()
 
 # make rolling windows
-#trace.make_windows()
-#trace.mask_windows()
-#trace.intersect_windows()
-#trace.calc_window_stats()
+trace.make_windows()
+trace.mask_windows()
+trace.intersect_windows()
+trace.calc_window_stats() 
