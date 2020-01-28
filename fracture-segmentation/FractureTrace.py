@@ -416,10 +416,18 @@ class FractureTrace(object):
         
     def write_scanline_tables(self):
         if self.limit_direction_to != 'vertical':
-            self.horizontal_scanlines.to_csv('horizontal_scanlines.csv')
+            (self
+             .horizontal_scanlines
+             .drop(['geometry', 'orig_geom', 'masked_geom'], axis=1)
+             .to_csv('horizontal_scanlines.csv')
+             )
             
         if self.limit_direction_to != 'horizontal':
-            self.vertical_scanlines.to_csv('vertical_scanlines.csv')
+            (self
+             .vertical_scanlines
+             .drop(['geometry', 'orig_geom', 'masked_geom'], axis=1)
+             .to_csv('vertical_scanlines.csv')
+             )
         
     def make_vertical_segments(self):
         self.vertical_segments = pd.concat(
@@ -625,10 +633,18 @@ class FractureTrace(object):
             
     def write_segment_tables(self):
         if self.limit_direction_to != 'vertical':
-            self.horizontal_segments.to_csv('horizontal_segments.csv')
+            (self
+             .horizontal_segments
+             .drop(['geometry', 'orig_geom', 'masked_geom'], axis=1)
+             .to_csv('horizontal_segments.csv')
+             )
             
         if self.limit_direction_to != 'horizontal':
-            self.vertical_segments.to_csv('vertical_segments.csv')
+            (self
+             .vertical_segments
+             .drop(['geometry', 'orig_geom', 'masked_geom'], axis=1)
+             .to_csv('vertical_segments.csv')
+             )
             
     def make_windows(self):
         vert_limits = list(self.traces.total_bounds[i] for i in [1,3])
@@ -657,8 +673,8 @@ class FractureTrace(object):
                 
         self.windows = gpd.GeoDataFrame({
                     'name': names,
-                    'y_coord': x_array,
-                    'x_coord': y_array},
+                    'x_coord': x_array,
+                    'y_coord': y_array},
                     geometry = polygons
                     )
             
@@ -797,4 +813,8 @@ class FractureTrace(object):
         print('Window stats calculated')
         
     def write_window_table(self):
-        self.windows.to_csv('windows.csv')
+        (self
+         .windows
+         .drop(['geometry','masked_geom'],axis=1)
+         .to_csv('windows.csv')
+         )
