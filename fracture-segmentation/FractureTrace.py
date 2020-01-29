@@ -418,14 +418,14 @@ class FractureTrace(object):
         if self.limit_direction_to != 'vertical':
             (self
              .horizontal_scanlines
-             .drop(['geometry', 'orig_geom', 'masked_geom'], axis=1)
+             .drop(['geometry', 'orig_geom', 'masked_geom','hull_trimmed'], axis=1)
              .to_csv('horizontal_scanlines.csv')
              )
             
         if self.limit_direction_to != 'horizontal':
             (self
              .vertical_scanlines
-             .drop(['geometry', 'orig_geom', 'masked_geom'], axis=1)
+             .drop(['geometry', 'orig_geom', 'masked_geom','hull_trimmed'], axis=1)
              .to_csv('vertical_scanlines.csv')
              )
         

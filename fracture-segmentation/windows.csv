@@ -1,4 +1,4 @@
-,name,y_coord,x_coord,orig_width,orig_height,orig_area,masked_width,masked_height,masked_area,masked_length,p20_masked,p21_masked
+,name,x_coord,y_coord,orig_width,orig_height,orig_area,masked_width,masked_height,masked_area,masked_length,p20_masked,p21_masked
 0,window_1,0.44893718435447005,-9.304578429580262,1.0,1.0,1.0,1.0,1.0,0.3939370172687476,4.0,0.0,0.0
 1,window_2,0.94893718435447,-9.304578429580262,1.0,1.0,1.0,1.0,0.2515686225007183,0.2515686225007183,2.5031372450014366,0.0,0.0
 2,window_3,1.44893718435447,-9.304578429580262,1.0,1.0,1.0,1.0,0.2515686225007183,0.2515686225007183,2.5031372450014366,0.0,0.0
