@@ -24,17 +24,18 @@ trace.scale(scale_m_px = 0.020699)
 trace.mask_traces()
 
 # Generate scanlines
-trace.scanline_distance_m = 1
+trace.scanline_distance_m = 0.5
 trace.make_scanlines()
 trace.mask_scanlines()
 trace.hull_scanlines()
 trace.intersect_scanlines()
+trace.make_horiz_scanline_spacing_df()
 trace.calc_scanline_stats()
 trace.write_scanline_tables()
 
 # make rolling segments along scanlines
 trace.segment_width_m = 1
-trace.segment_step_increment_m = 0.5
+trace.segment_step_increment_m = 1
 trace.make_segments()
 trace.mask_segments()
 trace.intersect_segments()
@@ -43,7 +44,7 @@ trace.write_segment_tables()
 
 # make rolling windows
 trace.window_width_m = 1
-trace.window_step_increment_m = 0.5
+trace.window_step_increment_m = 1
 trace.make_windows()
 trace.mask_windows()
 trace.intersect_windows()

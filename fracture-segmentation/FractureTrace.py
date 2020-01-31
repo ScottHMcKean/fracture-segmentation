@@ -259,6 +259,7 @@ class FractureTrace(object):
     def intersect_horizontal_scanlines(self):
         self.horiz_scanline_intersections = [
                 self.traces.intersection(other = scanline) 
+                if ~scanline.is_empty else Linestring()
                 for scanline
                 in self.horizontal_scanlines.geometry
                 ]
@@ -335,6 +336,39 @@ class FractureTrace(object):
             
             plt.show()
     
+    def make_horiz_scanline_spacing_df(self):
+        
+        for (i,scanline) in self.horizontal_scanlines.iterrows():
+            
+            if scanline.geometry.is_empty:
+                continue
+            
+            if len(self.horiz_scanline_intersected_traces[i]) == 0:
+                continue
+            
+            out_df = gpd.GeoDataFrame(
+                {'x' : self.horiz_scanline_intersected_points[i].x},
+                geometry = self.horiz_scanline_intersected_points[i]
+                ).sort_values('x').reset_index()
+            
+            out_df['name'] = scanline['name']
+            out_df['frac_num'] = np.array(out_df.index) + 1
+            out_df['distance'] = out_df['x'] - out_df['x'].min()
+            out_df['spacing'] = np.append(0,np.diff(out_df['x']))
+            out_df['height'] = np.array(
+                    self.horiz_scanline_intersected_traces[i].bounds.iloc[:,3]
+                    - self.horiz_scanline_intersected_traces[i].bounds.iloc[:,1]
+                    )
+            
+            try:
+                self.horiz_scanline_spacing_df = (
+                        self.horiz_scanline_spacing_df.append(
+                                out_df, ignore_index = True, sort = True)
+                        )
+            except AttributeError:
+                self.horiz_scanline_spacing_df = out_df
+
+
     def calc_horizontal_scanline_stats(self):
         
         self.horizontal_scanlines['frac_to_frac_length'] = [

@@ -1,0 +1,48 @@
+---
+title: "fracture_segmentation_plots"
+author: "Scott McKean"
+date: "1/31/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(viridis)
+```
+```{r}
+scanlines = read_csv('../fracture-segmentation/horizontal_scanlines.csv')
+
+ggplot(scanlines) +
+  geom_line(aes(x = y_coord, y = p10_trimmed)) +
+  geom_point(aes(x = y_coord, y = p10_trimmed)) +
+  geom_area(aes(x = y_coord, y = p10_trimmed)) +
+  coord_flip() +
+  theme_minimal() +
+  ggsave('horiz_scanline.eps', height = 10, width = 2)
+
+```
+
+
+
+```{r}
+windows = read_csv('../fracture-segmentation/windows.csv')
+scale = 0.002069
+
+#P20
+ggplot(windows  %>% dplyr::filter(!is.na(p20_masked) & p20_masked > 0)) +
+  geom_tile(aes(x=x_coord/scale, y=y_coord/scale, fill = p20_masked)) +
+  scale_fill_gradientn(colors = viridis_pal(option = 'inferno')(10), limits=c(0, 150),
+                       na.value = "#FCFFA4FF") +
+  theme_minimal() +
+  coord_equal() + 
+  ggsave('window_p20_heatmap.eps')
+
+#P21
+ggplot(windows %>% dplyr::filter(!is.na(p21_masked) & p21_masked > 0)) +
+  geom_tile(aes(x=x_coord/scale, y=y_coord/scale, fill = p21_masked)) +
+  scale_fill_gradientn(colors = viridis_pal(option = 'magma')(10), limits=c(0, 5),
+                       na.value = "#FCFDBFFF") +
+  theme_minimal() +
+  coord_equal() +
+  ggsave('window_p21_heatmap.eps')
+```
