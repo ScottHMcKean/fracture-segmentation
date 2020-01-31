@@ -368,7 +368,49 @@ class FractureTrace(object):
             except AttributeError:
                 self.horiz_scanline_spacing_df = out_df
 
+        print('Horizontal scanline spacing dataframe generated')
 
+    def make_vert_scanline_spacing_df(self):
+        
+        for (i,scanline) in self.vertical_scanlines.iterrows():
+            
+            if scanline.geometry.is_empty:
+                continue
+            
+            if len(self.vert_scanline_intersected_traces[i]) == 0:
+                continue
+            
+            out_df = gpd.GeoDataFrame(
+                {'y' : self.vert_scanline_intersected_points[i].y},
+                geometry = self.vert_scanline_intersected_points[i]
+                ).sort_values('y').reset_index()
+            
+            out_df['name'] = scanline['name']
+            out_df['frac_num'] = np.array(out_df.index) + 1
+            out_df['distance'] = out_df['y'] - out_df['y'].min()
+            out_df['spacing'] = np.append(0,np.diff(out_df['y']))
+            out_df['height'] = np.array(
+                    self.vert_scanline_intersected_traces[i].bounds.iloc[:,2]
+                    - self.vert_scanline_intersected_traces[i].bounds.iloc[:,0]
+                    )
+            
+            try:
+                self.vert_scanline_spacing_df = (
+                        self.vert_scanline_spacing_df.append(
+                                out_df, ignore_index = True, sort = True)
+                        )
+            except AttributeError:
+                self.vert_scanline_spacing_df = out_df
+
+        print('Vertical scanline spacing dataframe generated')
+    
+    def make_scanline_spacing_dfs(self):
+        if self.limit_direction_to != 'vertical':
+            self.make_horiz_scanline_spacing_df()
+            
+        if self.limit_direction_to != 'horizontal':
+            self.make_vert_scanline_spacing_df()
+    
     def calc_horizontal_scanline_stats(self):
         
         self.horizontal_scanlines['frac_to_frac_length'] = [
@@ -456,13 +498,25 @@ class FractureTrace(object):
              .to_csv('horizontal_scanlines.csv')
              )
             
+            (self
+             .horiz_scanline_spacing_df
+             .drop(['geometry'], axis=1)
+             .to_csv('horiz_scanline_spacing.csv')
+             )
+            
         if self.limit_direction_to != 'horizontal':
             (self
              .vertical_scanlines
              .drop(['geometry', 'orig_geom', 'masked_geom','hull_trimmed'], axis=1)
              .to_csv('vertical_scanlines.csv')
              )
-        
+            
+            (self
+             .vert_scanline_spacing_df
+             .drop(['geometry'], axis=1)
+             .to_csv('vert_scanline_spacing.csv')
+             )
+            
     def make_vertical_segments(self):
         self.vertical_segments = pd.concat(
                 [make_vertical_segments(

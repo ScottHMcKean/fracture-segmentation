@@ -17,7 +17,7 @@ exec(open('FractureTrace.py').read())
 # Initialize and load
 trace = FractureTrace()
 trace.show_figures = True
-trace.limit_direction_to = 'horizontal'
+trace.limit_direction_to = 'none'
 trace.load_traces('./input/ET_TestWindow_AutoFractures.dxf')
 trace.load_masks('./input/ET_TestWindow_Mask.dxf')
 trace.scale(scale_m_px = 0.020699)
@@ -29,7 +29,7 @@ trace.make_scanlines()
 trace.mask_scanlines()
 trace.hull_scanlines()
 trace.intersect_scanlines()
-trace.make_horiz_scanline_spacing_df()
+trace.make_scanline_spacing_dfs()
 trace.calc_scanline_stats()
 trace.write_scanline_tables()
 
