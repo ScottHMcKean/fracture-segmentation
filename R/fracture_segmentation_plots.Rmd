@@ -8,7 +8,11 @@ output: html_document
 ```{r setup, include=FALSE}
 library(tidyverse)
 library(viridis)
+source('ecdf.R')
 ```
+
+Scanlines
+
 ```{r}
 scanlines = read_csv('../fracture-segmentation/horizontal_scanlines.csv')
 
@@ -22,7 +26,7 @@ ggplot(scanlines) +
 
 ```
 
-
+Windows
 
 ```{r}
 windows = read_csv('../fracture-segmentation/windows.csv')
@@ -45,4 +49,20 @@ ggplot(windows %>% dplyr::filter(!is.na(p21_masked) & p21_masked > 0)) +
   theme_minimal() +
   coord_equal() +
   ggsave('window_p21_heatmap.eps')
+```
+
+Spacing Dataframe
+
+```{r}
+spacing_df = read_csv('../fracture-segmentation/horiz_scanline_spacing.csv')
+
+ecdf = make_ecdf(spacing_df$height)
+
+ggplot(ecdf) +
+  geom_point(aes(x = centres, y = ecdf)) +
+  geom_line(aes(x = centres, y = ecdf)) +
+  scale_x_log10() +
+  scale_y_log10() +
+  ylab('Log N') +
+  xlab('Log Fracture Height (m)')
 ```
