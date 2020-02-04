@@ -14,7 +14,7 @@ source('ecdf.R')
 Scanlines
 
 ```{r}
-scanlines = read_csv('../fracture-segmentation/horizontal_scanlines.csv')
+scanlines = read_csv('G:/My Drive/PhD/Analysis/EvanThomas_Montney/horizontal_scanlines_South_Wall_50cm.csv')
 
 ggplot(scanlines) +
   geom_line(aes(x = y_coord, y = p10_trimmed)) +
@@ -29,22 +29,26 @@ ggplot(scanlines) +
 Windows
 
 ```{r}
-windows = read_csv('../fracture-segmentation/windows.csv')
+windows = read_csv('G:/My Drive/PhD/Analysis/EvanThomas_Montney/windows_SouthWall_10m+5m.csv')
 scale = 0.002069
 
+# Filter windows here if (masked_area)/(orig_area) > x remove
+windows_filt = windows %>% 
+  dplyr::filter(masked_area/orig_area > 0.75)
+
 #P20
-ggplot(windows  %>% dplyr::filter(!is.na(p20_masked) & p20_masked > 0)) +
+ggplot(windows_filt  %>% dplyr::filter(!is.na(p20_masked) & p20_masked > 0)) +
   geom_tile(aes(x=x_coord/scale, y=y_coord/scale, fill = p20_masked)) +
-  scale_fill_gradientn(colors = viridis_pal(option = 'inferno')(10), limits=c(0, 150),
+  scale_fill_gradientn(colors = viridis_pal(option = 'inferno')(10), #limits=c(0, 5),
                        na.value = "#FCFFA4FF") +
   theme_minimal() +
   coord_equal() + 
   ggsave('window_p20_heatmap.eps')
 
 #P21
-ggplot(windows %>% dplyr::filter(!is.na(p21_masked) & p21_masked > 0)) +
+ggplot(windows_filt %>% dplyr::filter(!is.na(p21_masked) & p21_masked > 0)) +
   geom_tile(aes(x=x_coord/scale, y=y_coord/scale, fill = p21_masked)) +
-  scale_fill_gradientn(colors = viridis_pal(option = 'magma')(10), limits=c(0, 5),
+  scale_fill_gradientn(colors = viridis_pal(option = 'magma')(10), #limits=c(0, 5),
                        na.value = "#FCFDBFFF") +
   theme_minimal() +
   coord_equal() +
@@ -54,15 +58,29 @@ ggplot(windows %>% dplyr::filter(!is.na(p21_masked) & p21_masked > 0)) +
 Spacing Dataframe
 
 ```{r}
-spacing_df = read_csv('../fracture-segmentation/horiz_scanline_spacing.csv')
+spacing_df = read_csv('G:/My Drive/PhD/Analysis/EvanThomas_Montney/horiz_scanline_spacing_SouthWall_50cm.csv')
 
-ecdf = make_ecdf(spacing_df$height)
+# method = 'freedman', 'rice', or 'sturges'
+for (this_name in unique(spacing_df$name)[1:10]){
+  this_spacing_df = spacing_df %>% dplyr::filter(name == this_name)
+  
+  if(nrow(this_spacing_df) <= 5) next
+  
+  ecdf = make_ecdf(this_spacing_df$height, method = 'freedman')
 
-ggplot(ecdf) +
-  geom_point(aes(x = centres, y = ecdf)) +
-  geom_line(aes(x = centres, y = ecdf)) +
-  scale_x_log10() +
-  scale_y_log10() +
-  ylab('Log N') +
-  xlab('Log Fracture Height (m)')
+  ggplot(ecdf) +
+    geom_point(aes(x = centres, y = ecdf)) +
+    geom_line(aes(x = centres, y = ecdf)) +
+    scale_x_log10() +
+    scale_y_log10() +
+    theme_minimal() +
+    ggtitle(this_name) +
+    ylab('Log N') +
+    xlab('Log Fracture Height (m)') +
+    ggsave(paste0(this_name,'_fracture_height_ecdf.eps'), height = 6, width = 6) +
+    ggsave(paste0(this_name,'fracture_height_ecdf.jpg'), height = 6, width = 6, dpi = 320)
+}
+
+
+
 ```
