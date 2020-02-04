@@ -64,14 +64,19 @@ spacing_df = read_csv('G:/My Drive/PhD/Analysis/EvanThomas_Montney/horiz_scanlin
 for (this_name in unique(spacing_df$name)[1:10]){
   this_spacing_df = spacing_df %>% dplyr::filter(name == this_name)
   
+  # skip all ECDFs with less than n observations
   if(nrow(this_spacing_df) <= 5) next
   
-  ecdf = make_ecdf(this_spacing_df$height, method = 'freedman')
+  ecdf = make_ecdf(this_spacing_df$height, method = 'freedman') %>%
+    dplyr::mutate(ecdf_norm = ecdf/nrow(.))
 
   ggplot(ecdf) +
+    #geom_point(aes(x = centres, y = ecdf_norm)) +
+    #geom_line(aes(x = centres, y = ecdf_norm)) +
     geom_point(aes(x = centres, y = ecdf)) +
     geom_line(aes(x = centres, y = ecdf)) +
     scale_x_log10() +
+    #xlim(-1,1) +
     scale_y_log10() +
     theme_minimal() +
     ggtitle(this_name) +
