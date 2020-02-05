@@ -14,9 +14,9 @@ source('ecdf.R')
 Scanlines
 
 ```{r}
-scanlines = read_csv('G:/My Drive/PhD/Analysis/EvanThomas_Montney/horizontal_scanlines_South_Wall_50cm.csv')
+scanline_df = read_csv('G:/My Drive/PhD/Analysis/EvanThomas_Montney/horizontal_scanlines_South_Wall_50cm.csv')
 
-ggplot(scanlines) +
+ggplot(scanline_df) +
   geom_line(aes(x = y_coord, y = p10_trimmed)) +
   geom_point(aes(x = y_coord, y = p10_trimmed)) +
   geom_area(aes(x = y_coord, y = p10_trimmed)) +
@@ -55,37 +55,67 @@ ggplot(windows_filt %>% dplyr::filter(!is.na(p21_masked) & p21_masked > 0)) +
   ggsave('window_p21_heatmap.eps')
 ```
 
-Spacing Dataframe
+Spacing Dataframe - Binned ECDF Plot
 
 ```{r}
 spacing_df = read_csv('G:/My Drive/PhD/Analysis/EvanThomas_Montney/horiz_scanline_spacing_SouthWall_50cm.csv')
 
 # method = 'freedman', 'rice', or 'sturges'
-for (this_name in unique(spacing_df$name)[1:10]){
+for (this_name in unique(spacing_df$name)[1:200]){
   this_spacing_df = spacing_df %>% dplyr::filter(name == this_name)
   
   # skip all ECDFs with less than n observations
   if(nrow(this_spacing_df) <= 5) next
   
-  ecdf = make_ecdf(this_spacing_df$height, method = 'freedman') %>%
+  ecdf = make_ecdf(this_spacing_df$height, method = 'rice') %>%
     dplyr::mutate(ecdf_norm = ecdf/nrow(.))
 
   ggplot(ecdf) +
-    #geom_point(aes(x = centres, y = ecdf_norm)) +
-    #geom_line(aes(x = centres, y = ecdf_norm)) +
     geom_point(aes(x = centres, y = ecdf)) +
     geom_line(aes(x = centres, y = ecdf)) +
     scale_x_log10() +
-    #xlim(-1,1) +
+    xlim(.0001,1) +
     scale_y_log10() +
     theme_minimal() +
     ggtitle(this_name) +
     ylab('Log N') +
     xlab('Log Fracture Height (m)') +
-    ggsave(paste0(this_name,'_fracture_height_ecdf.eps'), height = 6, width = 6) +
-    ggsave(paste0(this_name,'fracture_height_ecdf.jpg'), height = 6, width = 6, dpi = 320)
+    ggsave(paste0(this_name,'binned_height_ecdf.eps'), height = 6, width = 6) +
+    ggsave(paste0(this_name,'binned_height_ecdf.eps'), height = 6, width = 6, dpi = 320)
 }
 
-
-
 ```
+
+Danny's Implementation <3
+
+```{r}
+for (this_name in unique(spacing_df$name)[1:300]){
+  
+  # skip all ECDFs with less than n observations
+  if(nrow(this_spacing_df) <= 5) next
+  
+  scanline_length = scanline_df %>% 
+    filter(name==this_name) %>%
+    pull(trimmed_length)
+  
+  heights = spacing_df %>% 
+    dplyr::filter(name == this_name) %>%
+    pull(height)
+  
+  output = rev_ecdf(heights) %>%
+    dplyr::mutate(height = value,
+                  intensity = count/scanline_length)
+  
+  #Make Plot
+  ggplot(output) +
+    geom_point(aes(x = height, y = intensity)) +
+    geom_line(aes(x = height, y = intensity)) +
+    scale_x_log10(limits=c(0.01,2))+
+    scale_y_log10(limits=c(0.0001,1))+
+    theme_minimal() +
+    ggtitle(this_name) +
+    ggsave(paste0(this_name,'height_ecdf.eps'), height = 6, width = 6) +
+    ggsave(paste0(this_name,'height_ecdf.jpg'), height = 6, width = 6, dpi = 320)
+}
+```
+

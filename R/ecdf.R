@@ -64,3 +64,20 @@ make_ecdf <- function(value_vector, method = 'rice') {
   
   data.frame(centres = centres, ecdf = ecdf) %>%  filter(centres >= mmaxc(centres, ecdf))
 }
+
+#' Unbinned reverse ECDF function
+#' @param value_vector a vector of continous values
+#' @return a dataframe with unique values and count
+#' @export
+rev_ecdf <- function(value_vector){
+  ecdf <- cut(value_vector,c(1,unique(value_vector),0)) %>%
+    table(value_vector) %>%
+    rowSums() %>%
+    rev() %>%
+    cumsum() %>%
+    rev()
+  
+  data.frame(value = sort(unique(value_vector)),
+             count = ecdf[1:length(unique(value_vector))],
+             row.names = NULL)
+}
