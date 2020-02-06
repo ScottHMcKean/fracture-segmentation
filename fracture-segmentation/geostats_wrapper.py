@@ -6,6 +6,7 @@ Created on Thu Jan 16 09:08:26 2020
 """
 import pandas as pd
 import numpy as np  
+import math
 import matplotlib.pyplot as plt
 from scipy.stats import rankdata, norm
 from scipy import spatial
@@ -22,4 +23,8 @@ gs_df.n_transform_feats()
 
 # Initialize a Variogram Object and perform EDA
 vgm = Variogram(gs_df.output)
+vgm.convert_azimuth()
+vgm.calculate_lags()
+
+
 vgm.variogram_map('n_porosity', lags = 11, dlag = 50)
