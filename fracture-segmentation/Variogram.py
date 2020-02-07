@@ -10,7 +10,8 @@ def calc_col_idx(k, i, n):
 
 class Variogram(object):
     """A class to analyze and model experimental variograms of a 
-    GeostatsDataFrame object"""
+    GeostatsDataFrame object. Based on GSLIB (Deutsch and
+    Journel, 1998) and Micheal Pyrcz's GeostatsPy package"""
     
     n_lags = 50
     max_dist = 1000
@@ -27,7 +28,9 @@ class Variogram(object):
     def convert_azimuth(self):
         """ Mathematical azimuth is measured counterclockwise from EW and
         not clockwise from NS as the conventional azimuth """
-        self.azimuth_ccw_ew_rad = (90.0 - self.azimuth_cw_from_ns_deg) * math.pi / 180.0
+        self.azimuth_ccw_ew_rad = (
+                (90.0 - self.azimuth_cw_from_ns_deg) * math.pi / 180.0
+                )
     
     def convert_azi_tol(self): 
         if self.azimuth_tolerance_deg <= 0.0:
@@ -63,9 +66,17 @@ class Variogram(object):
         
         self.lags = pd.concat([self.lags.reset_index(drop=True), pairs], axis=1)
         
-        self.lags['pt_1_val'] = [self.gs_df.loc[pt,self.val_col] for pt in self.lags.pt_1]
-        self.lags['pt_2_val'] = [self.gs_df.loc[pt,self.val_col] for pt in self.lags.pt_2]
-        self.lags['sq_val_diff'] = (self.lags['pt_1_val'] - self.lags['pt_2_val'])**2
+        self.lags['pt_1_val'] = [
+                self.gs_df.loc[pt,self.val_col] for pt in self.lags.pt_1
+                ]
+        
+        self.lags['pt_2_val'] = [
+                self.gs_df.loc[pt,self.val_col] for pt in self.lags.pt_2
+                ]
+        
+        self.lags['sq_val_diff'] = (
+                (self.lags['pt_1_val'] - self.lags['pt_2_val'])**2
+                )
 
     def filter_lags_distance(self):
         self.lags = self.lags[self.lags.xy_dist <= self.max_dist]
@@ -126,6 +137,9 @@ class Variogram(object):
             
         self.omni_variogram['lag_bin'] = self.lag_bins
         
+    def write_omni_variogram(self):
+        self.omni_variogram.to_csv('omni_variogram.csv')
+        
     def calc_azi_variogram(self):
         self.lags = self.lags_orig.copy()
         self.convert_azimuth()
@@ -134,14 +148,25 @@ class Variogram(object):
         self.bin_lags()
         self.set_default_lag_tolerance()
         
-        self.azi_variogram = pd.DataFrame([
+        azi_variogram = pd.DataFrame([
                 self.calc_lag_semivariance(lag_bin) 
                 for lag_bin 
                 in self.lag_bins
                 ], columns = ('semivariance', 'n_pairs'))
             
-        self.azi_variogram['lag_bin'] = self.lag_bins
+        azi_variogram['lag_bin'] = self.lag_bins
+        azi_variogram['azimuth'] = self.azimuth_cw_from_ns_deg
         
+        if hasattr(self, 'azi_variogram'):
+            self.azi_variogram = self.azi_variogram.append(
+                    azi_variogram, ignore_index=True
+                    )
+        else:
+            self.azi_variogram = azi_variogram
+    
+    def write_azi_variogram(self):
+        self.azi_variogram.to_csv('azi_variogram.csv')
+    
     def make_variogram_map(self):
         self.lags = self.lags_orig.copy()
         self.map_bin_lags()
@@ -195,8 +220,11 @@ class Variogram(object):
         self.variogram_map = self.variogram_map[
                 self.variogram_map['n_pairs'] >= min_points
                 ]
-        
-    def plot_variogram_map(self, max_lag_limit = 500):
+    
+    def write_variogram_map(self):
+        self.variogram_map.to_csv('variogram_map.csv')
+    
+    def plot_variogram_map(self, lag_limit = 500):
 
         x = self.variogram_map[['x']]
         y = self.variogram_map[['y']]
@@ -213,11 +241,11 @@ class Variogram(object):
         plt.xlabel(r'x lag (m)')
         plt.ylabel(r'y lag (m)')
         plt.title('Variogram Map: ' + self.val_col)
-        plt.xlim([-max_lag_limit,max_lag_limit])
-        plt.ylim([-max_lag_limit,max_lag_limit])
+        plt.xlim([-lag_limit,lag_limit])
+        plt.ylim([-lag_limit,lag_limit])
         plt.show()
         
-    def plot_npairs_map(self, max_lag_limit = 500):
+    def plot_npairs_map(self, lag_limit = 500):
 
         x = self.variogram_map[['x']]
         y = self.variogram_map[['y']]
@@ -234,6 +262,6 @@ class Variogram(object):
         plt.xlabel(r'x lag (m)')
         plt.ylabel(r'y lag (m)')
         plt.title('Pairs Plot: ' + self.val_col)
-        plt.xlim([-max_lag_limit,max_lag_limit])
-        plt.ylim([-max_lag_limit,max_lag_limit])
+        plt.xlim([-lag_limit,lag_limit])
+        plt.ylim([-lag_limit,lag_limit])
         plt.show()

@@ -11,7 +11,7 @@ import descartes
 import matplotlib.pyplot as plt
 from shapely import geometry
 from shapely.geometry import Point, LineString, Polygon
-exec(open('helpers.py').read())
+exec(open('fracture_helpers.py').read())
 exec(open('FractureTrace.py').read())
 
 # Initialize and load

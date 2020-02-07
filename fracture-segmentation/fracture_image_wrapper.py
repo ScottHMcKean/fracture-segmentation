@@ -12,7 +12,7 @@ from skimage.morphology import binary_closing, square
 from skimage.transform import probabilistic_hough_line
 from shapely.geometry import LineString
 import geopandas as gpd
-exec(open('helpers.py').read())
+exec(open('fracture_helpers.py').read())
 exec(open('canny.py').read())
 exec(open('FractureImage.py').read())
 
