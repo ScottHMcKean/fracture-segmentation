@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 def calc_row_idx(k, n):
     return int(math.ceil((1/2.) * (- (-8*k + 4 *n**2 -4*n - 7)**0.5 + 2*n -1) - 1))
 
@@ -7,383 +8,232 @@ def elem_in_i_rows(i, n):
 def calc_col_idx(k, i, n):
     return int(n - elem_in_i_rows(i + 1, n) + k)
 
-# -*- coding: utf-8 -*-
 class Variogram(object):
     """A class to analyze and model experimental variograms of a 
     GeostatsDataFrame object"""
     
-    xlag_dist = 50
-    ylag_dist = 50
-    lag_dist_tol = 2
     n_lags = 50
-    azimuth_cw_ns = 90
-    azi_tol = 1
-    dlag = 10
-    bandwidth = 10
-    epsilon = 1.0e-20
+    max_dist = 1000
+    azimuth_cw_from_ns_deg = 90
+    azimuth_tolerance_deg = 45
+    bandwidth_tolerance = 250
+    epsilon = 1.0e-5
     
-    def __init__(self, geostats_df):
+    def __init__(self, geostats_df, val_col_str):
         self.gs_df = geostats_df
+        self.val_col = val_col_str
+        self.convert_azi_tol()
 
     def convert_azimuth(self):
         """ Mathematical azimuth is measured counterclockwise from EW and
         not clockwise from NS as the conventional azimuth """
-        self.azimuth_ccw_ew = (90.0 - self.azimuth_cw_ns) * math.pi / 180.0
-         
-        if self.azi_tol <= 0.0:
-            self.azi_tol_ccw = math.cos(45.0 * math.pi / 180.0)
+        self.azimuth_ccw_ew_rad = (90.0 - self.azimuth_cw_from_ns_deg) * math.pi / 180.0
+    
+    def convert_azi_tol(self): 
+        if self.azimuth_tolerance_deg <= 0.0:
+            self.azi_tol_rad = math.cos(45.0 * math.pi / 180.0)
         else:
-            self.azi_tol_ccw = math.cos(self.azi_tol * math.pi / 180.0)
+            self.azi_tol_rad = math.cos(self.azimuth_tolerance_deg * math.pi / 180.0)
+
+    def set_default_lag_tolerance(self):
+        self.lag_tolerance = np.diff(self.lag_bins).min()/2
 
     def condensed_to_square(self, k):
         i = calc_row_idx(k, len(self.gs_df))
         j = calc_col_idx(k, i, len(self.gs_df))
         return i, j
 
+    def get_lags_wrapper(self):
+        self.calculate_lags()
+        self.map_values_to_lags()
+        self.filter_lags_distance()
+        self.lags_orig = self.lags.copy()
+        
     def calculate_lags(self):
         h = ssd.pdist(self.gs_df[['x','y']])
-        h_filt = h.copy()
-        
-        max_dist = (
-                (float(self.n_lags) + 0.5 - self.epsilon) 
-                * max(self.xlag_dist, self.ylag_dist)
-                )
-        
-        h_filt[h > max_dist] = np.nan
-        h_filt[h < self.epsilon] = np.nan
-        
-        self.lags = pd.DataFrame(h_filt, columns = ('lag_dist',))
+        x = ssd.pdist(self.gs_df[['x']], lambda u,v : u-v)
+        y = ssd.pdist(self.gs_df[['y']], lambda u,v : u-v)
+        self.lags = pd.DataFrame({'xy_dist': h, 'x_dist': x, 'y_dist': y})
 
-    def map_values_to_lags(self, k):
+    def map_values_to_lags(self):
         pairs = pd.DataFrame(
-                [self.condensed_to_square(i) for i in range(1,len(self.lags))],
+                [self.condensed_to_square(i) for i in range(0,len(self.lags))],
                 columns = ('pt_1', 'pt_2')
                 )
         
         self.lags = pd.concat([self.lags.reset_index(drop=True), pairs], axis=1)
         
-        df_c = pd.concat([df_a
-       
+        self.lags['pt_1_val'] = [self.gs_df.loc[pt,self.val_col] for pt in self.lags.pt_1]
+        self.lags['pt_2_val'] = [self.gs_df.loc[pt,self.val_col] for pt in self.lags.pt_2]
+        self.lags['sq_val_diff'] = (self.lags['pt_1_val'] - self.lags['pt_2_val'])**2
 
-def variogram_loop(x, y, vr, xlag, xltol, nlag, azm, atol, bandwh):
-    """Calculate the variogram by looping over combinatorial of data pairs.
-    :param x: x values
-    :param y: y values
-    :param vr: property values
-    :param xlag: lag distance
-    :param xltol: lag distance tolerance
-    :param nlag: number of lags to calculate
-    :param azm: azimuth
-    :param atol: azimuth tolerance
-    :param bandwh: horizontal bandwidth / maximum distance offset orthogonal to
-                   azimuth
-    :return: TODO
-    """
-    # Allocate the needed memory
-    
-    nvarg = 1
-    mxdlv = nlag + 2  # in gamv the npp etc. arrays go to nlag + 2
-    dis = np.zeros(mxdlv)
-    lag = np.zeros(mxdlv)  # TODO: not used
-    vario = np.zeros(mxdlv)
-    hm = np.zeros(mxdlv)
-    tm = np.zeros(mxdlv)
-    hv = np.zeros(mxdlv)  # TODO: not used
-    npp = np.zeros(mxdlv)
-    ivtail = np.zeros(nvarg + 2)
-    ivhead = np.zeros(nvarg + 2)
-    ivtype = np.ones(nvarg + 2)
-    ivtail[0] = 0
-    ivhead[0] = 0
-    ivtype[0] = 0
-    nsiz = nlag + 2  # TODO: not used
-    nd = len(x)    
-
-    
-                # Determine which lag this is and skip if outside the defined
-                # distance tolerance
-                if h <= EPSLON:
-                    lagbeg = 0
-                    lagend = 0
-                else:
-                    lagbeg = -1
-                    lagend = -1
-                    for ilag in range(1, nlag + 1):
-                        # reduced to -1
-                        if (
-                            (xlag * float(ilag - 1) - xltol)
-                            <= h
-                            <= (xlag * float(ilag - 1) + xltol)
-                        ):
-                            if lagbeg < 0:
-                                lagbeg = ilag
-                            lagend = ilag
-                if lagend >= 0:
-                    # Definition of the direction corresponding to the current
-                    # pair. All directions are considered (overlapping of
-                    # direction tolerance cones is allowed)
-
-                    # Check for an acceptable azimuth angle
-                    dxy = np.sqrt(max((dxs + dys), 0.0))
-                    if dxy < EPSLON:
-                        dcazm = 1.0
-                    else:
-                        dcazm = (dx * math.cos(azimuth_ccw_ew) + dy * math.sin(azimuth_ccw_ew)) / dxy
-
-                    # Check the horizontal bandwidth criteria (maximum deviation
-                    # perpendicular to the specified direction azimuth)
-                    band = math.cos(azimuth_ccw_ew) * dy - math.sin(azimuth_ccw_ew) * dx
-
-                    # Apply all the previous checks at once to avoid a lot of
-                    # nested if statements
-                    if (abs(dcazm) >= csatol) and (abs(band) <= bandwh):
-                        # Check whether or not an omni-directional variogram is
-                        # being computed
-                        omni = False
-                        if atol >= 90.0:
-                            omni = True
-
-                        # For this variogram, sort out which is the tail and
-                        # the head value
-                        if dcazm >= 0.0:
-                            vrh = vr[i]
-                            vrt = vr[j]
-                            if omni:
-                                vrtpr = vr[i]
-                                vrhpr = vr[j]
-                        else:
-                            vrh = vr[j]
-                            vrt = vr[i]
-                            if omni:
-                                vrtpr = vr[j]
-                                vrhpr = vr[i]
-
-                        # Reject this pair on the basis of missing values
-
-                        # Data was trimmed at the beginning
-
-                        # The Semivariogram (all other types of measures are
-                        # removed for now)
-                        for il in range(lagbeg, lagend + 1):
-                            npp[il] = npp[il] + 1
-                            dis[il] = dis[il] + h
-                            tm[il] = tm[il] + vrt
-                            hm[il] = hm[il] + vrh
-                            vario[il] = vario[il] + ((vrh - vrt) * (vrh - vrt))
-                            if omni:
-                                npp[il] = npp[il] + 1.0
-                                dis[il] = dis[il] + h
-                                tm[il] = tm[il] + vrtpr
-                                hm[il] = hm[il] + vrhpr
-                                vario[il] = vario[il] + (
-                                    (vrhpr - vrtpr) * (vrhpr - vrtpr)
-                                )
-
-    # Get average values for gam, hm, tm, hv, and tv, then compute the correct
-    # "variogram" measure
-    for il in range(0, nlag + 2):
-        i = il
-        if npp[i] > 0:
-            rnum = npp[i]
-            dis[i] = dis[i] / rnum
-            vario[i] = vario[i] / rnum
-            hm[i] = hm[i] / rnum
-            tm[i] = tm[i] / rnum
-
-    return dis, vario, npp
-
-    
-    def varmap2d(self, val_col):
+    def filter_lags_distance(self):
+        self.lags = self.lags[self.lags.xy_dist <= self.max_dist]
+        self.lags = self.lags[self.lags.xy_dist > self.epsilon]
         
-        pd.Data
+    def bin_lags(self):
+        self.lag_bins = np.linspace(
+                self.lags.xy_dist.min(), 
+                self.lags.xy_dist.max(), 
+                self.n_lags+2
+                )[1:-1]
+    
+    def calculate_azimuth(self):
+        self.lags['azimuth_dist'] = (
+                self.lags.x_dist * math.cos(self.azimuth_ccw_ew_rad) 
+                + self.lags.y_dist * math.sin(self.azimuth_ccw_ew_rad)
+                ) / self.lags.xy_dist
         
-    
-    
-    
-    
-    
-    
-    
-    
-    
-   
-    for index, row in ij_tuple.iterrows():
-      y_dis = self.gs_df['y'][row.j] - self.gs_df['y'][i]
-      x_dis = self.gs_df['x'][j] - self.gs_df['x'][i]
-      iyl = lags + int(ydis/dlag)
-      ixl = lags + int(ydis/dlag)
-      df_out = pd.DataFrame({'y':y_dis, 'x':x_dis, 'iy':iyl, 'ix':ixl})
-      
-    ij_tuple.['i']
-      
-    def ydis(i,j):
-        
-    geostats_df
-    
-     for i in range(0,nrow):     
-            for j in range(0,nrow): 
-                ydis = y[j] - y[i]
-                iyl = lags + int(ydis/dlag)
-                if iyl < 0 or iyl > lags*2: # acocunting for 0,...,n-1 array indexing
-                    continue
-                xdis = x[j] - x[i]
-                ixl = lags + int(xdis/dlag)
-                if ixl < 0 or ixl > lags*2: # acocunting for 0,...,n-1 array indexing
-                    continue
-                    
-                # We have an acceptable pair, therefore accumulate all the statistics
-                # that are required for the variogram:
-                npp[iyl,ixl] = npp[iyl,ixl] + 1 # our ndarrays read from the base to top, so we flip
-                tm[iyl,ixl] = tm[iyl,ixl] + val[i]
-                hm[iyl,ixl] = hm[iyl,ixl] + val[j]
-                tv[iyl,ixl] = tm[iyl,ixl] + val[i]*val[i]
-                hv[iyl,ixl] = hm[iyl,ixl] + val[j]*val[j]
-                gam[iyl,ixl] = gam[iyl,ixl] + ((val[i]-val[j])*(val[i]-val[j]))
-    
-    for i,j in range(0,10):
-        print(i)
-        print(j)
-    
-    
-    xmax = ((float(nx)+0.5)*lagdist); xmin = -1*xmax; 
-    ymax = ((float(ny)+0.5)*lagdist); ymin = -1*ymax;
-    
-    
-    def variogram_map(self, column, lags = 10, dlag = 1):
-        """Simplified reimplementation of Deutsch and Journel (1998) variogram 
-        map with a standardized sill and GeostatsDataFrame object"""
-        
-        nrow = len(self.gs_df)
-        
-        # initialize arrays
-        zeroes = np.zeros((lags*2+1,lags*2+1))
-        npp, gam, nppf, gamf, hm, tm, hv, tv = (
-                zeroes, zeroes, zeroes, zeroes,zeroes,zeroes,zeroes,zeroes
+        self.lags['bandwidth_dist'] = (
+                math.cos(self.azimuth_ccw_ew_rad) * self.lags.y_dist 
+                - math.sin(self.azimuth_ccw_ew_rad) * self.lags.x_dist
                 )
     
-        x = np.array(self.gs_df['x'])
-        y = np.array(self.gs_df['y'])
-        val = np.array(self.gs_df[column])
- 
-       
+    def filter_lags_azimuth(self):
+        self.lags = self.lags[
+                self.lags.azimuth_dist <= self.azi_tol_rad
+                ]
+        
+        self.lags = self.lags[
+                self.lags.bandwidth_dist <= self.bandwidth_tolerance
+                ]
     
-        # Get average values for gam, hm, tm, hv, and tv, then compute
-        # the correct "variogram" measure:
-        for iy in range(0,lags*2+1): 
-            for ix in range(0,lags*2+1): 
-                if npp[iy,ix] <= 1:
-                    gam[iy,ix] = -999.
-                    hm[iy,ix]  = -999.
-                    tm[iy,ix]  = -999.
-                    hv[iy,ix]  = -999.
-                    tv[iy,ix]  = -999.
-                else:
-                    rnum = npp[iy,ix]
-                    gam[iy,ix] = gam[iy,ix] / (2*rnum) # semivariogram
-                    hm[iy,ix] = hm[iy,ix] / rnum
-                    tm[iy,ix] = tm[iy,ix] / rnum
-                    hv[iy,ix] = hv[iy,ix] / rnum - hm[iy,ix]*hm[iy,ix]
-                    tv[iy,ix] = tv[iy,ix] / rnum - tm[iy,ix]*tm[iy,ix]
-                    
-        # Standardize
-        gamf[iy,ix] = gamf[iy,ix]/df[column].std()**2
+    def calc_lag_semivariance(self, lag_bin):
+        lag_df = self.lags[
+                    (self.lags.xy_dist >= lag_bin - self.lag_tolerance) 
+                    & (self.lags.xy_dist <= lag_bin + self.lag_tolerance)
+                    ]
+        
+        n_pairs = len(lag_df)
+        
+        if n_pairs == 0:
+            return np.nan, 0
+        
+        semivariance = lag_df.sq_val_diff.sum()/(2*n_pairs)
+        
+        return semivariance, n_pairs
     
-        for iy in range(0,lags*2+1): 
-            for ix in range(0,lags*2+1):             
-                gamf[iy,ix] = gam[lags*2-iy,ix]
-                nppf[iy,ix] = npp[lags*2-iy,ix]
-                
-        self.vmap = gamf
-        self.npmap = nppf 
+    def calc_omni_variogram(self):
+        self.lags = self.lags_orig.copy()
+        self.bin_lags()
+        self.set_default_lag_tolerance()
+        
+        self.omni_variogram = pd.DataFrame([
+                self.calc_lag_semivariance(lag_bin) 
+                for lag_bin 
+                in self.lag_bins
+                ], columns = ('semivariance', 'n_pairs'))
+            
+        self.omni_variogram['lag_bin'] = self.lag_bins
+        
+    def calc_azi_variogram(self):
+        self.lags = self.lags_orig.copy()
+        self.convert_azimuth()
+        self.calculate_azimuth()
+        self.filter_lags_azimuth()
+        self.bin_lags()
+        self.set_default_lag_tolerance()
+        
+        self.azi_variogram = pd.DataFrame([
+                self.calc_lag_semivariance(lag_bin) 
+                for lag_bin 
+                in self.lag_bins
+                ], columns = ('semivariance', 'n_pairs'))
+            
+        self.azi_variogram['lag_bin'] = self.lag_bins
+        
+    def make_variogram_map(self):
+        self.lags = self.lags_orig.copy()
+        self.map_bin_lags()
+        self.set_map_lag_tolerance()
+        
+        self.variogram_map = pd.DataFrame([
+                self.calc_map_semivariance(x,y) 
+                for x in self.map_xx[0,:] 
+                for y in self.map_yy[:,0]
+                ], columns = ('x','y','semivariance', 'n_pairs')).dropna()
+                  
+    def map_bin_lags(self):
+        x_lags = np.linspace(
+                self.lags.x_dist.min(), 
+                self.lags.x_dist.max(), 
+                self.n_lags+2
+                )[1:-1]
+        
+        y_lags = np.linspace(
+                self.lags.x_dist.min(), 
+                self.lags.x_dist.max(), 
+                self.n_lags+2
+                )[1:-1]
+        
+        self.map_xx, self.map_yy = np.meshgrid(x_lags, y_lags, sparse = True)
+        
+    def set_map_lag_tolerance(self):
+        self.map_lag_tolerance = np.min([
+                np.diff(self.map_xx).min()/2,
+                np.diff(np.transpose(self.map_yy)).min()/2
+                ])
+
+    def calc_map_semivariance(self, x, y):
+        lag_df = self.lags[
+                    (self.lags.x_dist >= x - self.lag_tolerance) 
+                    & (self.lags.x_dist <= x + self.lag_tolerance)
+                    & (self.lags.y_dist >= y - self.lag_tolerance)
+                    & (self.lags.y_dist <= y + self.lag_tolerance)
+                    ]
+        
+        n_pairs = len(lag_df)
+        
+        if n_pairs == 0:
+            return np.nan, 0
+        
+        semivariance = lag_df.sq_val_diff.sum()/(2*n_pairs)
+        
+        return x, y, semivariance, n_pairs
     
-    def variogram_map(self, column, lags = 10, dlag = 1):
-        plt.subplot(121)
-        GSLIB.pixelplt_st(self.vmap,-575,575,-575,575,50.0,0,1.6,'Nscore Porosity Variogram Map','X(m)','Y(m)','Nscore Variogram',cmap)
+    def filt_variogram_map(self, min_points):
+        self.variogram_map = self.variogram_map[
+                self.variogram_map['n_pairs'] >= min_points
+                ]
+        
+    def plot_variogram_map(self, max_lag_limit = 500):
 
-    def variogram_plot(self, step = 100):
-         xx, yy = np.meshgrid(
-                 np.linspace(self.gs_df.x.min(), self.gs_df.x.max(), self.gamf.shape[0]), 
-                 np.linspace(self.gs_df.y.max(), self.gs_df.y.min(), self.gamf.shape[0])
-                 )
-         
-         cs = plt.contourf(xx, yy, self.gamf,)
-        xx,
-        yy,
-        array,
-        cmap=cmap,
-        vmin=vmin,
-        vmax=vmax,
-        levels=np.linspace(vmin, vmax, 100),
-    )
+        x = self.variogram_map[['x']]
+        y = self.variogram_map[['y']]
+        z = self.variogram_map[['semivariance']]
+        
+        x_vals, x_idx = np.unique(x, return_inverse=True)
+        y_vals, y_idx = np.unique(y, return_inverse=True)
+        vals_array = np.empty(x_vals.shape + y_vals.shape)
+        vals_array.fill(np.nan)
+        vals_array[x_idx, y_idx] = np.array(z.iloc[:,0])
+        z_vals = vals_array.T
+        
+        plt.contourf(x_vals,y_vals,z_vals, cmap = plt.cm.inferno)
+        plt.xlabel(r'x lag (m)')
+        plt.ylabel(r'y lag (m)')
+        plt.title('Variogram Map: ' + self.val_col)
+        plt.xlim([-max_lag_limit,max_lag_limit])
+        plt.ylim([-max_lag_limit,max_lag_limit])
+        plt.show()
+        
+    def plot_npairs_map(self, max_lag_limit = 500):
 
-def pixelplt_st(
-    array,
-    xmin,
-    xmax,
-    ymin,
-    ymax,
-    step,
-    vmin,
-    vmax,
-    title,
-    xlabel,
-    ylabel,
-    vlabel,
-    cmap,
-):
-    """Pixel plot, reimplementation in Python of GSLIB pixelplt with Matplotlib
-    methods (version for subplots).
-
-    :param array: ndarray
-    :param xmin: x axis minimum
-    :param xmax: x axis maximum
-    :param ymin: y axis minimum
-    :param ymax: y axis maximum
-    :param step: step
-    :param vmin: TODO
-    :param vmax: TODO
-    :param title: title
-    :param xlabel: label for x axis
-    :param ylabel: label for y axis
-    :param vlabel: TODO
-    :param cmap: colormap
-    :return: QuadContourSet
-    """
-   
-
-    # Use dummy since scatter plot controls legend min and max appropriately
-    # and contour does not!
-    x = []
-    y = []
-    v = []
-
-    cs = plt.contourf(
-        xx,
-        yy,
-        array,
-        cmap=cmap,
-        vmin=vmin,
-        vmax=vmax,
-        levels=np.linspace(vmin, vmax, 100),
-    )
-    im = plt.scatter(
-        x,
-        y,
-        s=None,
-        c=v,
-        marker=None,
-        cmap=cmap,
-        vmin=vmin,
-        vmax=vmax,
-        alpha=0.8,
-        linewidths=0.8,
-        verts=None,
-        edgecolors="black",
-    )
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.clim(vmin, vmax)
-    cbar = plt.colorbar(im, orientation="vertical")
-    cbar.set_label(vlabel, rotation=270, labelpad=20)
-    return cs
+        x = self.variogram_map[['x']]
+        y = self.variogram_map[['y']]
+        z = self.variogram_map[['n_pairs']]
+        
+        x_vals, x_idx = np.unique(x, return_inverse=True)
+        y_vals, y_idx = np.unique(y, return_inverse=True)
+        vals_array = np.empty(x_vals.shape + y_vals.shape)
+        vals_array.fill(np.nan)
+        vals_array[x_idx, y_idx] = np.array(z.iloc[:,0])
+        z_vals = vals_array.T
+        
+        plt.contourf(x_vals,y_vals,z_vals, cmap = plt.cm.inferno)
+        plt.xlabel(r'x lag (m)')
+        plt.ylabel(r'y lag (m)')
+        plt.title('Pairs Plot: ' + self.val_col)
+        plt.xlim([-max_lag_limit,max_lag_limit])
+        plt.ylim([-max_lag_limit,max_lag_limit])
+        plt.show()
